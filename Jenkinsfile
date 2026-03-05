@@ -7,7 +7,7 @@ kind: Pod
 spec:
   containers:
   - name: docker
-    image: docker:24.0.6-dind-alpine
+    image: docker:latest
     command:
     - cat
     tty: true
@@ -32,9 +32,8 @@ spec:
     }
 
     stages {
-        stage('Build & Push') {
+        stage('Build & Push Image') {
             steps {
-                // Bắt buộc phải bọc trong container('docker') để dùng được lệnh docker
                 container('docker') {
                     script {
                         def fullImage = "${NEXUS_REGISTRY}/${REPO_NAME}/${IMAGE_NAME}:${BUILD_NUMBER}"
@@ -47,9 +46,8 @@ spec:
                 }
             }
         }
-        stage('Update GitOps') {
+        stage('Update GitOps Repo') {
             steps {
-                // Bước này không cần docker, chạy ở container mặc định cũng được
                 withCredentials([usernamePassword(credentialsId: "${GITHUB_CREDS}", passwordVariable: 'GIT_PASS', usernameVariable: 'GIT_USER')]) {
                     sh "rm -rf my-app-gitops || true"
                     sh "git clone https://${GIT_USER}:${GIT_PASS}@${GITOPS_REPO}"
