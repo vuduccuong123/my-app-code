@@ -37,9 +37,13 @@ spec:
                 container('docker') {
                     script {
                         def fullImage = "${NEXUS_REGISTRY}/${REPO_NAME}/${IMAGE_NAME}:${BUILD_NUMBER}"
+                        
+                        // 1. Build
                         sh "docker build -t ${fullImage} ."
                         
-                        docker.withRegistry("https://${NEXUS_REGISTRY}", "${NEXUS_CREDS}") {
+                        // 2. Login và Push dùng thông tin từ Credentials
+                        withCredentials([usernamePassword(credentialsId: "${NEXUS_CREDS}", passwordVariable: 'NEXUS_PASS', usernameVariable: 'NEXUS_USER')]) {
+                            sh "docker login https://${NEXUS_REGISTRY} -u ${NEXUS_USER} -p ${NEXUS_PASS}"
                             sh "docker push ${fullImage}"
                         }
                     }
@@ -52,7 +56,9 @@ spec:
                     sh "rm -rf my-app-gitops || true"
                     sh "git clone https://${GIT_USER}:${GIT_PASS}@${GITOPS_REPO}"
                     dir('my-app-gitops') {
+                        // Sửa file deployment.yaml
                         sh "sed -i 's|image:.*|image: ${NEXUS_REGISTRY}/${REPO_NAME}/${IMAGE_NAME}:${BUILD_NUMBER}|g' deployment.yaml"
+                        
                         sh """
                             git config user.email "jenkins@tudaolw.io.vn"
                             git config user.name "Jenkins-CI"
