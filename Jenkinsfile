@@ -26,11 +26,11 @@ spec:
         NEXUS_REGISTRY = 'nexus.tudaolw.io.vn'
         REPO_NAME      = 'docker-hosted' 
         IMAGE_NAME     = 'my-node-app'
-        // Không dùng https:// ở đây vì sẽ cộng chuỗi ở dưới
         GITOPS_REPO    = 'github.com/vuduccuong123/my-app-gitops.git'
         
         NEXUS_CREDS    = 'nexus-credentials-id'
-        GITHUB_CREDS   = 'github-token-id'
+        // Đã đổi sang ID mới theo yêu cầu của bạn
+        GITHUB_CREDS   = 'github-token-final' 
     }
 
     stages {
@@ -54,24 +54,27 @@ spec:
         stage('Update GitOps Repo') {
             steps {
                 withCredentials([usernamePassword(credentialsId: "${GITHUB_CREDS}", passwordVariable: 'GIT_PASS', usernameVariable: 'GIT_USER')]) {
-                    // Xóa thư mục cũ để clone mới hoàn toàn
+                    // Xóa sạch để tránh cache git cũ trong workspace
                     sh "rm -rf my-app-gitops || true"
                     
-                    // 1. Clone sử dụng Token trực tiếp trong URL
+                    // Clone trực tiếp dùng Token mới
                     sh "git clone https://${GIT_USER}:${GIT_PASS}@${GITOPS_REPO}"
                     
                     dir('my-app-gitops') {
-                        // 2. Sửa file deployment.yaml
+                        // Sửa file deployment.yaml
                         sh "sed -i 's|image:.*|image: ${NEXUS_REGISTRY}/${REPO_NAME}/${IMAGE_NAME}:${BUILD_NUMBER}|g' deployment.yaml"
                         
-                        // 3. Cấu hình User và Push dùng Token xác thực
                         sh """
-                            git config user.email 'jenkins@tudaolw.io.vn'
-                            git config user.name 'Jenkins-CI'
-                            git add deployment.yaml
-                            git commit -m 'Update image version ${BUILD_NUMBER}'
+                            git config user.email "jenkins@tudaolw.io.vn"
+                            git config user.name "Jenkins-CI"
                             
-                            # QUAN TRỌNG: Push trực tiếp bằng URL chứa Token để tránh lỗi 403
+                            # Xóa mọi cấu hình credential helper nếu có
+                            git config --local --unset credential.helper || true
+                            
+                            git add deployment.yaml
+                            git commit -m "Update image version ${BUILD_NUMBER}"
+                            
+                            # Push ép buộc sử dụng Token mới thông qua URL
                             git push https://${GIT_USER}:${GIT_PASS}@${GITOPS_REPO} main
                         """
                     }
